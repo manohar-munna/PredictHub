@@ -1,0 +1,40 @@
+<!-- app/templates/leaderboard.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto text-center space-y-8">
+    
+    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8 rounded-xl shadow-lg">
+        <h2 class="text-4xl font-extrabold mb-2">🏆 Richest Predictors</h2>
+        <p class="text-indigo-100">Who has the biggest wallet?</p>
+    </div>
+
+    <div class="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+        <table class="w-full text-left">
+            <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold border-b">
+                <tr>
+                    <th class="px-6 py-4">Rank</th>
+                    <th class="px-6 py-4">User</th>
+                    <th class="px-6 py-4 text-right">Balance</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for player in top_users %}
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-6 py-4 font-bold text-slate-400">#{{ loop.index }}</td>
+                    <td class="px-6 py-4 font-medium text-slate-800 flex items-center gap-2">
+                        {% if loop.index == 1 %}👑{% endif %}
+                        {{ player.username }}
+                        {% if user and user.id == player.id %}
+                            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-2">You</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right font-bold text-yellow-600">💰 {{ player.balance }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+{% endblock %}
