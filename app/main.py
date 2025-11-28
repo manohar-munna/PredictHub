@@ -11,7 +11,7 @@ import bcrypt
 from datetime import datetime
 import requests
 import time
-import os # <--- Needed for Environment Variables
+import os 
 
 from . import models, database
 
@@ -19,16 +19,17 @@ app = FastAPI(title="PredictHub")
 
 # --- CONFIGURATION ---
 
+# 1. Get secrets from Environment (Vercel)
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_API_KEY_HERE")
 APP_INVITE_CODE = "VIP2025" 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") # <--- Default to 'admin' if not set
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") # Defaults to 'admin' if not set
 
 # --- CACHING SETUP ---
 NEWS_CACHE = {
     "data": {},
     "last_fetched": {} 
 }
-CACHE_TIMEOUT = 900 
+CACHE_TIMEOUT = 900 # 15 Minutes
 
 # --- Security Setup ---
 
@@ -68,6 +69,7 @@ def get_current_user(request: Request, db: Session):
 
 # --- Helper: Check if Admin ---
 def is_user_admin(user: models.User):
+    # Returns True if user is logged in AND their username matches the Env Var
     return user and user.username == ADMIN_USERNAME
 
 def calculate_percentages(market):
@@ -86,7 +88,7 @@ async def read_home(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("home.html", {
         "request": request, 
         "user": user,
-        "is_admin": is_user_admin(user) # Pass admin status
+        "is_admin": is_user_admin(user)
     })
 
 @app.get("/news", response_class=HTMLResponse)
@@ -97,6 +99,7 @@ def read_news(request: Request, category: str = "general", db: Session = Depends
     articles = []
     error = None
 
+    # Cache Logic
     if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
         articles = NEWS_CACHE["data"][category]
     else:
@@ -232,7 +235,7 @@ async def read_markets(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "markets": markets,
         "user": user,
-        "is_admin": is_user_admin(user) # Pass admin status
+        "is_admin": is_user_admin(user)
     })
 
 @app.get("/predict/{market_id}", response_class=HTMLResponse)
@@ -263,7 +266,7 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
         "yes_pct": yes_pct,
         "no_pct": no_pct,
         "user": user,
-        "is_admin": is_user_admin(user) # Pass admin status
+        "is_admin": is_user_admin(user)
     })
 
 @app.post("/predict/{market_id}", response_class=HTMLResponse)
@@ -346,7 +349,6 @@ async def create_market_submit(
     db: Session = Depends(get_db)
 ):
     user = get_current_user(request, db)
-    # SECURITY CHECK
     if not is_user_admin(user):
         return HTMLResponse("Unauthorized", status_code=403)
 
@@ -357,12 +359,12 @@ async def create_market_submit(
 
 @app.post("/admin/resolve/{market_id}", response_class=RedirectResponse)
 async def resolve_market(
+    request: Request, # <--- FIXED: This was missing before!
     market_id: int,
     outcome: str = Form(...),
     db: Session = Depends(get_db)
 ):
     user = get_current_user(request, db)
-    # SECURITY CHECK
     if not is_user_admin(user):
         return HTMLResponse("Unauthorized", status_code=403)
 
