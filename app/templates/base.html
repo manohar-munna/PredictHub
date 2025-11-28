@@ -1,50 +1,41 @@
-<!-- app/templates/base.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PredictHub</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+<!-- app/templates/register.html -->
+{% extends "base.html" %}
 
-    <nav class="bg-indigo-600 text-white shadow-md">
-        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-            <a href="/" class="text-xl font-bold tracking-wide">PredictHub</a>
-            
-            <div class="flex items-center space-x-6 text-sm font-medium">
-                <a href="/markets" class="hover:text-indigo-200 transition">Markets</a>
-                <a href="/leaderboard" class="hover:text-indigo-200 transition">🏆 Leaderboard</a>
-                <a href="/news" class="hover:text-indigo-200 transition">📰 News</a> <!-- NEW LINK -->
-                
-                {% if user %}
-                    <a href="/profile" class="hover:text-indigo-200 transition flex items-center gap-1">
-                        👤 {{ user.username }} 
-                        <span class="bg-yellow-400 text-yellow-900 font-bold text-xs px-2 py-0.5 rounded-full ml-1">
-                            💰 {{ user.balance }}
-                        </span>
-                    </a>
-                    <a href="/logout" class="bg-indigo-700 hover:bg-indigo-800 px-3 py-1 rounded transition">
-                        Logout
-                    </a>
-                {% else %}
-                    <a href="/login" class="hover:text-indigo-200 transition">Login</a>
-                    <a href="/register" class="bg-white text-indigo-600 px-3 py-1 rounded font-bold hover:bg-slate-100 transition">
-                        Sign Up
-                    </a>
-                {% endif %}
-            </div>
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg border border-slate-200 mt-10">
+    <h2 class="text-2xl font-bold mb-6 text-center text-slate-900">Join PredictHub</h2>
+    
+    {% if error %}
+    <p class="text-red-500 text-center mb-4 text-sm font-bold">{{ error }}</p>
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-slate-700">Username</label>
+            <input type="text" name="username" required 
+                   class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
         </div>
-    </nav>
+        
+        <div>
+            <label class="block text-sm font-medium text-slate-700">Password</label>
+            <input type="password" name="password" required 
+                   class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+        
+        <!-- THIS WAS MISSING -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700">Invite Code</label>
+            <input type="text" name="invite_code" placeholder="Enter VIP Code (VIP2025)" required 
+                   class="w-full px-4 py-2 border border-yellow-300 bg-yellow-50 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
 
-    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8">
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="bg-slate-200 text-slate-500 py-4 text-center text-sm">
-        <p>&copy; 2024 PredictHub. Powered by Nene.</p>
-    </footer>
-
-</body>
-</html>
+        <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition transform hover:-translate-y-0.5">
+            Sign Up
+        </button>
+    </form>
+    
+    <p class="text-center mt-4 text-sm text-slate-500">
+        Already have an account? <a href="/login" class="text-indigo-600 hover:underline">Login</a>
+    </p>
+</div>
+{% endblock %}
