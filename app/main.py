@@ -1,9 +1,6 @@
 # app/main.py
 
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -389,3 +386,4 @@ async def resolve_market(
         db.commit()
         
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
+
