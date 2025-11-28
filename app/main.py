@@ -1,7 +1,5 @@
 # app/main.py
 
-import os
-
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -12,7 +10,8 @@ from pathlib import Path
 import bcrypt
 from datetime import datetime
 import requests
-import time # <--- Needed for caching
+import time
+import os # <--- Needed for Environment Variables
 
 from . import models, database
 
@@ -20,16 +19,16 @@ app = FastAPI(title="PredictHub")
 
 # --- CONFIGURATION ---
 
-# 🔴 PASTE YOUR NEWSAPI.ORG KEY HERE 🔴
-NEWS_API_KEY = os.getenv("NewsAPI_key")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_API_KEY_HERE")
+APP_INVITE_CODE = "VIP2025" 
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") # <--- Default to 'admin' if not set
 
-# --- CACHING SETUP (NEW) ---
-# We store news here so we don't have to call the API every second
+# --- CACHING SETUP ---
 NEWS_CACHE = {
-    "data": {},       # Stores the articles: {'sports': [...], 'bollywood': [...]}
-    "last_fetched": {} # Stores the time: {'sports': 17000000.00}
+    "data": {},
+    "last_fetched": {} 
 }
-CACHE_TIMEOUT = 900 # 15 Minutes (in seconds)
+CACHE_TIMEOUT = 900 
 
 # --- Security Setup ---
 
@@ -67,6 +66,10 @@ def get_current_user(request: Request, db: Session):
         return None
     return db.query(models.User).filter(models.User.id == user_id).first()
 
+# --- Helper: Check if Admin ---
+def is_user_admin(user: models.User):
+    return user and user.username == ADMIN_USERNAME
+
 def calculate_percentages(market):
     total = market.yes_pool + market.no_pool
     if total == 0:
@@ -75,29 +78,17 @@ def calculate_percentages(market):
     no_pct = 100 - yes_pct 
     return yes_pct, no_pct
 
-# --- Startup Seed ---
-@app.on_event("startup")
-def startup_populate_db():
-    db = database.SessionLocal()
-    if db.query(models.Market).count() == 0:
-        samples = [
-            models.Market(question="Will it rain in Mumbai tomorrow?", category="Weather"),
-            models.Market(question="Will India win the next cricket ODI match?", category="Sports"),
-            models.Market(question="Bitcoin price above $100k by Dec 31?", category="Crypto"),
-        ]
-        db.add_all(samples)
-        db.commit()
-    db.close()
-
 # --- ROUTES ---
 
 @app.get("/", response_class=HTMLResponse)
 async def read_home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    return templates.TemplateResponse("home.html", {"request": request, "user": user})
+    return templates.TemplateResponse("home.html", {
+        "request": request, 
+        "user": user,
+        "is_admin": is_user_admin(user) # Pass admin status
+    })
 
-# --- NEWS ROUTE (OPTIMIZED WITH CACHE) ---
-# Note: Removed 'async' to allow threading for requests (prevents server freezing)
 @app.get("/news", response_class=HTMLResponse)
 def read_news(request: Request, category: str = "general", db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -106,16 +97,9 @@ def read_news(request: Request, category: str = "general", db: Session = Depends
     articles = []
     error = None
 
-    # 1. CHECK CACHE FIRST
-    # If we have data AND it is less than 15 minutes old
     if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
-        print(f"⚡ Serving {category} news from CACHE (Instant)")
         articles = NEWS_CACHE["data"][category]
-    
     else:
-        # 2. FETCH FROM API (If cache is empty or old)
-        print(f"🌍 Fetching {category} news from API (Slow)...")
-        
         search_terms = {
             "general": "india news",
             "business": "india business market stocks",
@@ -128,19 +112,15 @@ def read_news(request: Request, category: str = "general", db: Session = Depends
         url = f"https://newsapi.org/v2/everything?q={query}&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
 
         try:
-            response = requests.get(url, timeout=5) # Add timeout so it doesn't hang forever
+            response = requests.get(url, timeout=5)
             data = response.json()
-            
             if data.get("status") == "ok":
                 articles = data.get("articles", [])[:20]
-                # SAVE TO CACHE
                 NEWS_CACHE["data"][category] = articles
                 NEWS_CACHE["last_fetched"][category] = current_time
             else:
                 error = data.get("message", "Unable to fetch news.")
-                
         except Exception as e:
-            print(f"Error: {e}")
             error = "Connection error to News API."
 
     return templates.TemplateResponse("news.html", {
@@ -148,9 +128,9 @@ def read_news(request: Request, category: str = "general", db: Session = Depends
         "user": user,
         "articles": articles,
         "current_category": category,
-        "error": error
+        "error": error,
+        "is_admin": is_user_admin(user)
     })
-
 
 # --- AUTH ROUTES ---
 
@@ -163,8 +143,15 @@ async def register_submit(
     request: Request, 
     username: str = Form(...), 
     password: str = Form(...), 
+    invite_code: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    if invite_code != APP_INVITE_CODE:
+        return templates.TemplateResponse("register.html", {
+            "request": request, 
+            "error": "Invalid Invite Code!"
+        })
+
     existing_user = db.query(models.User).filter(models.User.username == username).first()
     if existing_user:
         return templates.TemplateResponse("register.html", {"request": request, "error": "Username taken"})
@@ -219,7 +206,8 @@ async def read_profile(request: Request, db: Session = Depends(get_db)):
         "request": request, 
         "user": user, 
         "votes": user_votes,
-        "transactions": transactions
+        "transactions": transactions,
+        "is_admin": is_user_admin(user)
     })
 
 @app.get("/leaderboard", response_class=HTMLResponse)
@@ -230,7 +218,8 @@ async def leaderboard_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("leaderboard.html", {
         "request": request,
         "user": user,
-        "top_users": top_users
+        "top_users": top_users,
+        "is_admin": is_user_admin(user)
     })
 
 # --- MARKET ROUTES ---
@@ -242,7 +231,8 @@ async def read_markets(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("markets.html", {
         "request": request,
         "markets": markets,
-        "user": user
+        "user": user,
+        "is_admin": is_user_admin(user) # Pass admin status
     })
 
 @app.get("/predict/{market_id}", response_class=HTMLResponse)
@@ -272,7 +262,8 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
         "previous_wager": previous_wager,
         "yes_pct": yes_pct,
         "no_pct": no_pct,
-        "user": user
+        "user": user,
+        "is_admin": is_user_admin(user) # Pass admin status
     })
 
 @app.post("/predict/{market_id}", response_class=HTMLResponse)
@@ -332,16 +323,19 @@ async def submit_prediction(
         "yes_pct": yes_pct,
         "no_pct": no_pct,
         "user": user,
-        "message": f"Bet placed! {wager} coins deducted."
+        "message": f"Bet placed! {wager} coins deducted.",
+        "is_admin": is_user_admin(user)
     })
 
-# --- ADMIN ROUTES ---
+# --- ADMIN ROUTES (SECURED) ---
 
 @app.get("/admin/create", response_class=HTMLResponse)
 async def create_market_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    if not user:
-         return RedirectResponse(url="/login", status_code=303)
+    # SECURITY CHECK
+    if not is_user_admin(user):
+         return HTMLResponse("Unauthorized Access", status_code=403)
+         
     return templates.TemplateResponse("create_market.html", {"request": request, "user": user})
 
 @app.post("/admin/create", response_class=RedirectResponse)
@@ -351,6 +345,11 @@ async def create_market_submit(
     category: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    user = get_current_user(request, db)
+    # SECURITY CHECK
+    if not is_user_admin(user):
+        return HTMLResponse("Unauthorized", status_code=403)
+
     new_market = models.Market(question=question, category=category, is_open=True)
     db.add(new_market)
     db.commit()
@@ -362,6 +361,11 @@ async def resolve_market(
     outcome: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    user = get_current_user(request, db)
+    # SECURITY CHECK
+    if not is_user_admin(user):
+        return HTMLResponse("Unauthorized", status_code=403)
+
     market = db.query(models.Market).filter(models.Market.id == market_id).first()
     if market and market.is_open:
         market.is_open = False
@@ -386,4 +390,3 @@ async def resolve_market(
         db.commit()
         
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
-
