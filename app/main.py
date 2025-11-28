@@ -1,5 +1,10 @@
 # app/main.py
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -8,10 +13,26 @@ from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy.orm import Session
 from pathlib import Path
 import bcrypt
+from datetime import datetime
+import requests
+import time # <--- Needed for caching
 
 from . import models, database
 
 app = FastAPI(title="PredictHub")
+
+# --- CONFIGURATION ---
+
+# 🔴 PASTE YOUR NEWSAPI.ORG KEY HERE 🔴
+NEWS_API_KEY = os.getenv("NewsAPI_key")
+
+# --- CACHING SETUP (NEW) ---
+# We store news here so we don't have to call the API every second
+NEWS_CACHE = {
+    "data": {},       # Stores the articles: {'sports': [...], 'bollywood': [...]}
+    "last_fetched": {} # Stores the time: {'sports': 17000000.00}
+}
+CACHE_TIMEOUT = 900 # 15 Minutes (in seconds)
 
 # --- Security Setup ---
 
@@ -50,7 +71,6 @@ def get_current_user(request: Request, db: Session):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 def calculate_percentages(market):
-    # Calculate based on MONEY (Pool), not number of votes
     total = market.yes_pool + market.no_pool
     if total == 0:
         return 50, 50
@@ -79,6 +99,62 @@ async def read_home(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     return templates.TemplateResponse("home.html", {"request": request, "user": user})
 
+# --- NEWS ROUTE (OPTIMIZED WITH CACHE) ---
+# Note: Removed 'async' to allow threading for requests (prevents server freezing)
+@app.get("/news", response_class=HTMLResponse)
+def read_news(request: Request, category: str = "general", db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    
+    current_time = time.time()
+    articles = []
+    error = None
+
+    # 1. CHECK CACHE FIRST
+    # If we have data AND it is less than 15 minutes old
+    if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
+        print(f"⚡ Serving {category} news from CACHE (Instant)")
+        articles = NEWS_CACHE["data"][category]
+    
+    else:
+        # 2. FETCH FROM API (If cache is empty or old)
+        print(f"🌍 Fetching {category} news from API (Slow)...")
+        
+        search_terms = {
+            "general": "india news",
+            "business": "india business market stocks",
+            "technology": "india technology startup crypto",
+            "sports": "india cricket sports",
+            "bollywood": "bollywood movies",
+            "politics": "india politics government"
+        }
+        query = search_terms.get(category, "india")
+        url = f"https://newsapi.org/v2/everything?q={query}&language=en&sortBy=publishedAt&apiKey={NEWS_API_KEY}"
+
+        try:
+            response = requests.get(url, timeout=5) # Add timeout so it doesn't hang forever
+            data = response.json()
+            
+            if data.get("status") == "ok":
+                articles = data.get("articles", [])[:20]
+                # SAVE TO CACHE
+                NEWS_CACHE["data"][category] = articles
+                NEWS_CACHE["last_fetched"][category] = current_time
+            else:
+                error = data.get("message", "Unable to fetch news.")
+                
+        except Exception as e:
+            print(f"Error: {e}")
+            error = "Connection error to News API."
+
+    return templates.TemplateResponse("news.html", {
+        "request": request,
+        "user": user,
+        "articles": articles,
+        "current_category": category,
+        "error": error
+    })
+
+
 # --- AUTH ROUTES ---
 
 @app.get("/register", response_class=HTMLResponse)
@@ -97,9 +173,13 @@ async def register_submit(
         return templates.TemplateResponse("register.html", {"request": request, "error": "Username taken"})
     
     hashed_pw = get_password_hash(password)
-    # NEW: Start with 1000 Coins
     new_user = models.User(username=username, hashed_password=hashed_pw, balance=1000)
     db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    txn = models.Transaction(user_id=new_user.id, amount=1000, description="Welcome Bonus 🎁")
+    db.add(txn)
     db.commit()
     
     return RedirectResponse(url="/login", status_code=303)
@@ -134,17 +214,20 @@ async def read_profile(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login", status_code=303)
     
     user_votes = db.query(models.Vote).filter(models.Vote.user_id == user.id).all()
+    transactions = db.query(models.Transaction).filter(
+        models.Transaction.user_id == user.id
+    ).order_by(models.Transaction.timestamp.desc()).all()
     
     return templates.TemplateResponse("profile.html", {
         "request": request, 
         "user": user, 
-        "votes": user_votes
+        "votes": user_votes,
+        "transactions": transactions
     })
 
 @app.get("/leaderboard", response_class=HTMLResponse)
 async def leaderboard_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    # Rank by Balance
     top_users = db.query(models.User).order_by(models.User.balance.desc()).limit(10).all()
     
     return templates.TemplateResponse("leaderboard.html", {
@@ -174,7 +257,6 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
 
     previous_choice = None
     previous_wager = 0
-    
     if user:
         existing_vote = db.query(models.Vote).filter(
             models.Vote.user_id == user.id, 
@@ -183,10 +265,7 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
         if existing_vote:
             previous_choice = existing_vote.choice
             previous_wager = existing_vote.wager
-    else:
-        # We disable betting for guests now (too complex to track fake money)
-        previous_choice = None
-
+    
     yes_pct, no_pct = calculate_percentages(market)
 
     return templates.TemplateResponse("predict.html", {
@@ -204,7 +283,7 @@ async def submit_prediction(
     request: Request, 
     market_id: int, 
     choice: str = Form(...),
-    wager: int = Form(...), # NEW: Wager Input
+    wager: int = Form(...),
     db: Session = Depends(get_db)
 ):
     user = get_current_user(request, db)
@@ -216,30 +295,30 @@ async def submit_prediction(
     if not user:
          return RedirectResponse(url="/login", status_code=303)
 
-    # 1. Validation: Do they have enough money?
     if wager <= 0:
         return HTMLResponse("Error: Wager must be positive.", status_code=400)
     if wager > user.balance:
         return HTMLResponse("Error: Insufficient funds!", status_code=400)
 
-    # 2. Check if already voted (Block changing votes for simplicity in V4 Betting)
     existing_vote = db.query(models.Vote).filter(
         models.Vote.user_id == user.id, 
         models.Vote.market_id == market_id
     ).first()
 
     if existing_vote:
-        return HTMLResponse("Error: You have already bet on this market. No changing allowed in betting mode!", status_code=400)
+        return HTMLResponse("Error: You have already bet on this market.", status_code=400)
 
-    # 3. Process the Bet
-    # Deduct balance
     user.balance -= wager
-    
-    # Create vote
     new_vote = models.Vote(user_id=user.id, market_id=market_id, choice=choice, wager=wager)
     db.add(new_vote)
     
-    # Add to Market Pool
+    txn = models.Transaction(
+        user_id=user.id, 
+        amount=-wager, 
+        description=f"Bet on {market.question} ({choice.upper()})"
+    )
+    db.add(txn)
+    
     if choice == "yes": market.yes_pool += wager
     else: market.no_pool += wager
 
@@ -291,27 +370,22 @@ async def resolve_market(
         market.is_open = False
         market.result = outcome
         
-        # --- PAYOUT LOGIC (Parimutuel) ---
-        
-        # 1. Calculate Pools
         total_pool = market.yes_pool + market.no_pool
         winning_pool = market.yes_pool if outcome == 'yes' else market.no_pool
         
-        # Only pay out if there were winners
         if winning_pool > 0:
             votes = db.query(models.Vote).filter(models.Vote.market_id == market_id).all()
-            
             for vote in votes:
                 if vote.choice == outcome:
-                    # Logic: Your Share = Your Wager / Total Winning Wagers
                     share = vote.wager / winning_pool
-                    payout = share * total_pool
-                    
-                    # Credit User
-                    vote.user.balance += int(payout)
-        
-        # (If winning_pool is 0, the house keeps the money from the losers)
-        
+                    payout = int(share * total_pool)
+                    vote.user.balance += payout
+                    txn = models.Transaction(
+                        user_id=vote.user.id, 
+                        amount=payout, 
+                        description=f"Won bet on {market.question}!"
+                    )
+                    db.add(txn)
         db.commit()
         
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
