@@ -1,6 +1,7 @@
 # app/models.py
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from datetime import datetime
 from .database import Base
 
 class User(Base):
@@ -9,11 +10,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     hashed_password = Column(String)
-    
-    # NEW: Wallet Balance (Starts at 1000)
     balance = Column(Integer, default=1000)
     
     votes = relationship("Vote", back_populates="user")
+    # NEW: Link to history
+    transactions = relationship("Transaction", back_populates="user")
 
 class Market(Base):
     __tablename__ = "markets"
@@ -22,7 +23,6 @@ class Market(Base):
     question = Column(String, index=True)
     category = Column(String)
     
-    # NEW: Track amount of MONEY bet, not just number of votes
     yes_pool = Column(Integer, default=0)
     no_pool = Column(Integer, default=0)
     
@@ -37,10 +37,20 @@ class Vote(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     market_id = Column(Integer, ForeignKey("markets.id"))
-    choice = Column(String) # 'yes' or 'no'
-    
-    # NEW: How much did they bet?
+    choice = Column(String)
     wager = Column(Integer, default=0)
     
     user = relationship("User", back_populates="votes")
     market = relationship("Market", back_populates="votes")
+
+# NEW TABLE
+class Transaction(Base):
+    __tablename__ = "transactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    amount = Column(Integer) # Can be positive (win) or negative (bet)
+    description = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    user = relationship("User", back_populates="transactions")
