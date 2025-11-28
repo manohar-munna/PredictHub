@@ -6,7 +6,8 @@
     <div class="flex justify-between items-center border-b pb-2">
         <h2 class="text-3xl font-bold text-slate-900">Active Markets</h2>
         
-        {% if user %}
+        <!-- ONLY ADMIN SEES THIS BUTTON -->
+        {% if is_admin %}
         <a href="/admin/create" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded transition">
             + New Market
         </a>
@@ -17,7 +18,6 @@
         {% for market in markets %}
         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition relative overflow-hidden">
             
-            <!-- Closed Badge Overlay -->
             {% if not market.is_open %}
             <div class="absolute top-0 right-0 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
                 RESOLVED: {{ market.result|upper }}
@@ -28,7 +28,6 @@
                 <span class="text-xs font-semibold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-2 py-1 rounded">
                     {{ market.category }}
                 </span>
-                <!-- FIXED: Now uses 'pool' instead of 'votes' -->
                 <span class="text-xs text-slate-400 font-medium">
                     Pool: {{ market.yes_pool + market.no_pool }} coins
                 </span>
