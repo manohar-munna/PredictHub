@@ -3,15 +3,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
-# 1. Try to get the URL from the Environment (Vercel)
-# 2. If not found, fall back to local SQLite file
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./predict.db")
+# Get DB URL
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
-# PostgreSQL requires "postgresql://" but some hosts give "postgres://"
+# DIAGNOSTIC PRINT: This will show up in Vercel Logs!
+if not SQLALCHEMY_DATABASE_URL:
+    print("⚠️ WARNING: DATABASE_URL not found. Falling back to SQLite.")
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./predict.db"
+else:
+    print("✅ SUCCESS: Found DATABASE_URL environment variable.")
+
+# Fix for Neon/Postgres URL format
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# SQLite needs specific arguments, PostgreSQL does not
+# Args for SQLite only
 connect_args = {}
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
     connect_args = {"check_same_thread": False}
