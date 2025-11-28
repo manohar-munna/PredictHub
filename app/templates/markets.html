@@ -6,7 +6,7 @@
     <div class="flex justify-between items-center border-b pb-2">
         <h2 class="text-3xl font-bold text-slate-900">Active Markets</h2>
         
-        <!-- ONLY ADMIN SEES THIS BUTTON -->
+        <!-- SECURE BUTTON: Only shows if logged in AND admin -->
         {% if is_admin %}
         <a href="/admin/create" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded transition">
             + New Market
