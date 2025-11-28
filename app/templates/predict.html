@@ -68,7 +68,6 @@
                             <p class="mb-4 text-slate-500">Place your bet (Balance: {{ user.balance }})</p>
                             
                             <form method="post" class="space-y-4">
-                                <!-- Wager Input -->
                                 <div class="flex justify-center items-center space-x-2">
                                     <label class="text-sm font-bold text-slate-700">Wager:</label>
                                     <input type="number" name="wager" min="1" max="{{ user.balance }}" value="50" required
@@ -125,8 +124,8 @@
 
         </div>
 
-        <!-- ADMIN ZONE -->
-        {% if market.is_open and user %}
+        <!-- ADMIN ZONE (ONLY VISIBLE TO ADMIN) -->
+        {% if is_admin and market.is_open %}
         <div class="mt-12 pt-8 border-t border-slate-300">
             <div class="bg-red-50 p-4 rounded-lg border border-red-200 text-center">
                 <p class="text-xs font-bold text-red-600 uppercase mb-2">Admin Zone</p>
