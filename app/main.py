@@ -21,8 +21,8 @@ app = FastAPI(title="PredictHub")
 
 # 1. Get secrets from Environment (Vercel)
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_API_KEY_HERE")
-APP_INVITE_CODE = "VIP2025" 
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") # Defaults to 'admin' if not set
+# APP_INVITE_CODE Removed
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") 
 
 # --- CACHING SETUP ---
 NEWS_CACHE = {
@@ -69,7 +69,6 @@ def get_current_user(request: Request, db: Session):
 
 # --- Helper: Check if Admin ---
 def is_user_admin(user: models.User):
-    # Returns True if user is logged in AND their username matches the Env Var
     return user and user.username == ADMIN_USERNAME
 
 def calculate_percentages(market):
@@ -99,7 +98,6 @@ def read_news(request: Request, category: str = "general", db: Session = Depends
     articles = []
     error = None
 
-    # Cache Logic
     if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
         articles = NEWS_CACHE["data"][category]
     else:
@@ -146,14 +144,10 @@ async def register_submit(
     request: Request, 
     username: str = Form(...), 
     password: str = Form(...), 
-    invite_code: str = Form(...),
+    # REMOVED invite_code argument
     db: Session = Depends(get_db)
 ):
-    if invite_code != APP_INVITE_CODE:
-        return templates.TemplateResponse("register.html", {
-            "request": request, 
-            "error": "Invalid Invite Code!"
-        })
+    # REMOVED invite_code check logic
 
     existing_user = db.query(models.User).filter(models.User.username == username).first()
     if existing_user:
@@ -330,12 +324,11 @@ async def submit_prediction(
         "is_admin": is_user_admin(user)
     })
 
-# --- ADMIN ROUTES (SECURED) ---
+# --- ADMIN ROUTES ---
 
 @app.get("/admin/create", response_class=HTMLResponse)
 async def create_market_page(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    # SECURITY CHECK
     if not is_user_admin(user):
          return HTMLResponse("Unauthorized Access", status_code=403)
          
@@ -359,7 +352,7 @@ async def create_market_submit(
 
 @app.post("/admin/resolve/{market_id}", response_class=RedirectResponse)
 async def resolve_market(
-    request: Request, # <--- FIXED: This was missing before!
+    request: Request,
     market_id: int,
     outcome: str = Form(...),
     db: Session = Depends(get_db)
