@@ -19,10 +19,9 @@ app = FastAPI(title="PredictHub")
 
 # --- CONFIGURATION ---
 
-# 1. Get secrets from Environment (Vercel)
+# Get secrets from Environment (Vercel)
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_API_KEY_HERE")
-# APP_INVITE_CODE Removed
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") 
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") # Defaults to 'admin' if not set
 
 # --- CACHING SETUP ---
 NEWS_CACHE = {
@@ -69,6 +68,7 @@ def get_current_user(request: Request, db: Session):
 
 # --- Helper: Check if Admin ---
 def is_user_admin(user: models.User):
+    # Returns True if user is logged in AND their username matches the Env Var
     return user and user.username == ADMIN_USERNAME
 
 def calculate_percentages(market):
@@ -98,6 +98,7 @@ def read_news(request: Request, category: str = "general", db: Session = Depends
     articles = []
     error = None
 
+    # Cache Logic
     if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
         articles = NEWS_CACHE["data"][category]
     else:
@@ -144,11 +145,8 @@ async def register_submit(
     request: Request, 
     username: str = Form(...), 
     password: str = Form(...), 
-    # REMOVED invite_code argument
     db: Session = Depends(get_db)
 ):
-    # REMOVED invite_code check logic
-
     existing_user = db.query(models.User).filter(models.User.username == username).first()
     if existing_user:
         return templates.TemplateResponse("register.html", {"request": request, "error": "Username taken"})
@@ -324,7 +322,7 @@ async def submit_prediction(
         "is_admin": is_user_admin(user)
     })
 
-# --- ADMIN ROUTES ---
+# --- ADMIN ROUTES (SECURED) ---
 
 @app.get("/admin/create", response_class=HTMLResponse)
 async def create_market_page(request: Request, db: Session = Depends(get_db)):
@@ -385,3 +383,65 @@ async def resolve_market(
         db.commit()
         
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
+
+# --- NEW: USER MANAGEMENT (ADMIN ONLY) ---
+
+@app.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_dashboard(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not is_user_admin(user):
+         return HTMLResponse("Unauthorized Access", status_code=403)
+    
+    all_users = db.query(models.User).order_by(models.User.id.asc()).all()
+    
+    return templates.TemplateResponse("admin_users.html", {
+        "request": request, 
+        "user": user, 
+        "all_users": all_users,
+        "is_admin": True
+    })
+
+@app.post("/admin/users/update/{target_id}", response_class=RedirectResponse)
+async def admin_update_balance(
+    target_id: int,
+    new_balance: int = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    user = get_current_user(request, db)
+    if not is_user_admin(user):
+        return HTMLResponse("Unauthorized", status_code=403)
+
+    target_user = db.query(models.User).filter(models.User.id == target_id).first()
+    if target_user:
+        diff = new_balance - target_user.balance
+        target_user.balance = new_balance
+        if diff != 0:
+            txn = models.Transaction(user_id=target_user.id, amount=diff, description="Admin adjustment 🛠️")
+            db.add(txn)
+        db.commit()
+    
+    return RedirectResponse(url="/admin/users", status_code=303)
+
+@app.post("/admin/users/delete/{target_id}", response_class=RedirectResponse)
+async def admin_delete_user(
+    target_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    user = get_current_user(request, db)
+    if not is_user_admin(user):
+        return HTMLResponse("Unauthorized", status_code=403)
+
+    if user.id == target_id:
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    target_user = db.query(models.User).filter(models.User.id == target_id).first()
+    if target_user:
+        # Delete related data manually to prevent FK errors
+        db.query(models.Vote).filter(models.Vote.user_id == target_id).delete()
+        db.query(models.Transaction).filter(models.Transaction.user_id == target_id).delete()
+        db.delete(target_user)
+        db.commit()
+    
+    return RedirectResponse(url="/admin/users", status_code=303)
