@@ -1,0 +1,66 @@
+<!-- app/templates/admin_users.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-bold text-slate-900">User Management 🛠️</h2>
+        <a href="/markets" class="text-indigo-600 hover:underline">Back to Markets</a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+        <table class="min-w-full divide-y divide-slate-200">
+            <thead class="bg-slate-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">ID</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Username</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Balance</th>
+                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Edit</th>
+                    <th class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-slate-200">
+                {% for target in all_users %}
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-6 py-4 text-sm text-slate-400">#{{ target.id }}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-slate-800">
+                        {{ target.username }}
+                        {% if user.username == target.username %}
+                            <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded">YOU</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm font-mono text-yellow-600 font-bold">
+                        💰 {{ target.balance }}
+                    </td>
+                    
+                    <!-- Update Balance Form -->
+                    <td class="px-6 py-4">
+                        <form action="/admin/users/update/{{ target.id }}" method="post" class="flex items-center space-x-2">
+                            <input type="number" name="new_balance" value="{{ target.balance }}" 
+                                   class="w-24 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-indigo-500">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1 px-3 rounded">
+                                Save
+                            </button>
+                        </form>
+                    </td>
+
+                    <!-- Delete Action -->
+                    <td class="px-6 py-4 text-right">
+                        {% if user.id != target.id %}
+                        <form action="/admin/users/delete/{{ target.id }}" method="post" onsubmit="return confirm('Are you sure you want to DELETE user {{ target.username }}? This cannot be undone.');">
+                            <button type="submit" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 hover:bg-red-100 px-3 py-1 rounded">
+                                DELETE 🗑️
+                            </button>
+                        </form>
+                        {% else %}
+                            <span class="text-xs text-slate-400">Admin</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
