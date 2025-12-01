@@ -218,11 +218,20 @@ async def leaderboard_page(request: Request, db: Session = Depends(get_db)):
     })
 
 # --- MARKET ROUTES ---
+# In app/main.py
 
 @app.get("/markets", response_class=HTMLResponse)
 async def read_markets(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    markets = db.query(models.Market).order_by(models.Market.id.desc()).all()
+    
+    # SORTING LOGIC FIXED:
+    # 1. models.Market.is_open.desc() -> Puts 'True' (Open) before 'False' (Closed)
+    # 2. models.Market.id.desc() -> Puts newest created markets first
+    markets = db.query(models.Market).order_by(
+        models.Market.is_open.desc(), 
+        models.Market.id.desc()
+    ).all()
+    
     return templates.TemplateResponse("markets.html", {
         "request": request,
         "markets": markets,
@@ -459,4 +468,5 @@ async def admin_delete_user(
         db.commit()
     
     return RedirectResponse(url="/admin/users", status_code=303)
+
 
