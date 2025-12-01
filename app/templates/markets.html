@@ -3,48 +3,52 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex justify-between items-center border-b pb-2">
+    <div class="flex justify-between items-center border-b pb-4">
         <h2 class="text-3xl font-bold text-slate-900">Active Markets</h2>
         
         <!-- SECURE BUTTON: Only shows if logged in AND admin -->
         {% if is_admin %}
-        <a href="/admin/create" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded transition">
+        <a href="/admin/create" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded transition shadow">
             + New Market
         </a>
         {% endif %}
     </div>
 
-    <div class="grid gap-6 md:grid-cols-2">
+    <!-- UPDATED GRID: Shows 1 on mobile, 2 on tablet, 4 on desktop -->
+    <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {% for market in markets %}
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition relative overflow-hidden">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition relative overflow-hidden flex flex-col justify-between h-full group">
             
+            <!-- Closed Badge -->
             {% if not market.is_open %}
-            <div class="absolute top-0 right-0 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">
+            <div class="absolute top-0 right-0 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10">
                 RESOLVED: {{ market.result|upper }}
             </div>
             {% endif %}
 
-            <div class="flex justify-between items-start">
-                <span class="text-xs font-semibold uppercase tracking-wider text-indigo-500 bg-indigo-50 px-2 py-1 rounded">
-                    {{ market.category }}
-                </span>
-                <span class="text-xs text-slate-400 font-medium">
-                    Pool: {{ market.yes_pool + market.no_pool }} coins
-                </span>
+            <div>
+                <div class="flex justify-between items-start mb-3">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                        {{ market.category }}
+                    </span>
+                    <span class="text-[10px] text-slate-400 font-medium flex items-center">
+                        💰 {{ market.yes_pool + market.no_pool }}
+                    </span>
+                </div>
+                
+                <h3 class="text-lg font-bold text-slate-800 leading-snug mb-4 group-hover:text-indigo-600 transition">
+                    {{ market.question }}
+                </h3>
             </div>
             
-            <h3 class="text-xl font-bold mt-3 mb-4 text-slate-800">
-                {{ market.question }}
-            </h3>
-            
             <a href="/predict/{{ market.id }}" 
-               class="inline-block w-full text-center 
-               {% if market.is_open %}bg-slate-100 hover:bg-slate-200 text-slate-700{% else %}bg-slate-50 text-slate-400{% endif %} 
-               font-semibold py-2 rounded transition">
-               {% if market.is_open %}Place Bet &rarr;{% else %}View Result{% endif %}
+               class="block w-full text-center text-sm
+               {% if market.is_open %}bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700{% else %}bg-slate-50 text-slate-400 border border-slate-100{% endif %} 
+               font-bold py-2.5 rounded-lg transition mt-auto">
+               {% if market.is_open %}Place Bet{% else %}View Result{% endif %}
             </a>
         </div>
         {% endfor %}
     </div>
 </div>
-{% endblock %}
+{% endblock %}v
