@@ -3,52 +3,82 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div class="flex justify-between items-center border-b pb-4">
-        <h2 class="text-3xl font-bold text-slate-900">Active Markets</h2>
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-end md:items-center border-b border-slate-800 pb-4 gap-4">
+        <div>
+            <h2 class="text-3xl font-bold text-white tracking-tight">Markets</h2>
+            <p class="text-slate-400 text-sm mt-1">Trade on future events in real-time.</p>
+        </div>
         
-        <!-- SECURE BUTTON: Only shows if logged in AND admin -->
+        <!-- SECURE BUTTON: Only shows if ADMIN -->
         {% if is_admin %}
-        <a href="/admin/create" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded transition shadow">
-            + New Market
+        <a href="/admin/create" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold py-2 px-4 rounded-lg transition shadow-lg shadow-indigo-900/20">
+            + Create Market
         </a>
         {% endif %}
     </div>
 
-    <!-- UPDATED GRID: Shows 1 on mobile, 2 on tablet, 4 on desktop -->
-    <div class="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+    <!-- MARKETS GRID -->
+    <!-- Expanded to show 5 items on very large screens to fill space -->
+    <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         {% for market in markets %}
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition relative overflow-hidden flex flex-col justify-between h-full group">
-            
-            <!-- Closed Badge -->
-            {% if not market.is_open %}
-            <div class="absolute top-0 right-0 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10">
-                RESOLVED: {{ market.result|upper }}
-            </div>
-            {% endif %}
-
-            <div>
-                <div class="flex justify-between items-start mb-3">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                        {{ market.category }}
-                    </span>
-                    <span class="text-[10px] text-slate-400 font-medium flex items-center">
-                        💰 {{ market.yes_pool + market.no_pool }}
-                    </span>
-                </div>
+        <a href="/predict/{{ market.id }}" class="group block h-full">
+            <div class="bg-slate-900 border border-slate-800 hover:border-slate-600 rounded-xl p-4 h-full flex flex-col justify-between transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50 relative overflow-hidden">
                 
-                <h3 class="text-lg font-bold text-slate-800 leading-snug mb-4 group-hover:text-indigo-600 transition">
-                    {{ market.question }}
-                </h3>
+                <!-- Resolved Badge -->
+                {% if not market.is_open %}
+                <div class="absolute top-0 right-0 bg-slate-700 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg z-10 uppercase tracking-wide">
+                    {{ market.result }} Won
+                </div>
+                {% endif %}
+
+                <!-- Card Top -->
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <!-- Image/Icon placeholder based on category -->
+                        <div class="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-lg border border-slate-700 text-slate-400">
+                            {% if market.category == 'Crypto' %}₿
+                            {% elif market.category == 'Sports' %}⚽
+                            {% elif market.category == 'Weather' %}🌤️
+                            {% else %}📰{% endif %}
+                        </div>
+                        
+                        <!-- Category Tag -->
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 group-hover:text-slate-300 transition">
+                            {{ market.category }}
+                        </span>
+                    </div>
+                    
+                    <!-- Question -->
+                    <h3 class="text-base font-semibold text-slate-100 leading-snug mb-4 group-hover:text-indigo-400 transition line-clamp-3">
+                        {{ market.question }}
+                    </h3>
+                </div>
+
+                <!-- Card Bottom (Stats) -->
+                <div class="mt-auto pt-4 border-t border-slate-800 flex justify-between items-center">
+                    <div class="text-xs text-slate-500">
+                        Vol: <span class="text-slate-300 font-mono">{{ market.yes_pool + market.no_pool }}</span>
+                    </div>
+                    
+                    <!-- Fake Odds / Action Button -->
+                    {% if market.is_open %}
+                        <div class="flex gap-2">
+                            <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs px-2 py-1 rounded font-bold group-hover:bg-emerald-500 group-hover:text-black transition">
+                                Yes
+                            </span>
+                            <span class="bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs px-2 py-1 rounded font-bold group-hover:bg-rose-500 group-hover:text-white transition">
+                                No
+                            </span>
+                        </div>
+                    {% else %}
+                        <span class="text-xs text-slate-500 font-medium">Ended</span>
+                    {% endif %}
+                </div>
             </div>
-            
-            <a href="/predict/{{ market.id }}" 
-               class="block w-full text-center text-sm
-               {% if market.is_open %}bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700{% else %}bg-slate-50 text-slate-400 border border-slate-100{% endif %} 
-               font-bold py-2.5 rounded-lg transition mt-auto">
-               {% if market.is_open %}Place Bet{% else %}View Result{% endif %}
-            </a>
-        </div>
+        </a>
         {% endfor %}
     </div>
 </div>
-{% endblock %}v
+{% endblock %}
