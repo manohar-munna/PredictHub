@@ -4,48 +4,52 @@
 {% block content %}
 <div class="space-y-6">
     
-    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h2 class="text-3xl font-bold text-slate-900">User Management 🛠️</h2>
+    <!-- Top Bar -->
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+        <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <span class="text-yellow-500">⚡</span> User Management
+        </h2>
         
         <!-- SEARCH BAR -->
         <form action="/admin/users" method="get" class="flex w-full sm:w-auto">
             <input type="text" name="search" placeholder="Search username..." 
                    value="{{ search_query if search_query else '' }}"
-                   class="px-4 py-2 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-indigo-500 outline-none w-full">
-            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-r-lg hover:bg-indigo-700 font-bold">
+                   class="px-4 py-2 bg-slate-950 border border-slate-700 text-white rounded-l-lg focus:ring-1 focus:ring-indigo-500 outline-none w-full placeholder-slate-600">
+            <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-r-lg hover:bg-indigo-500 font-bold border-t border-b border-r border-indigo-600 transition">
                 🔍
             </button>
             {% if search_query %}
-            <a href="/admin/users" class="ml-2 bg-slate-200 text-slate-600 px-3 py-2 rounded-lg hover:bg-slate-300">
+            <a href="/admin/users" class="ml-2 bg-slate-800 text-slate-400 px-3 py-2 rounded-lg hover:bg-slate-700 border border-slate-700 transition">
                 ✕
             </a>
             {% endif %}
         </form>
     </div>
 
-    <div class="bg-white rounded-xl shadow border border-slate-200 overflow-hidden overflow-x-auto">
-        <table class="min-w-full divide-y divide-slate-200">
-            <thead class="bg-slate-50">
+    <!-- Dark Table -->
+    <div class="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-800">
+            <thead class="bg-slate-950/50">
                 <tr>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">ID</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Username</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Balance</th>
-                    <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase">Update</th>
-                    <th class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase">Delete</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">ID</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">User</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Balance</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Action</th>
+                    <th class="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Delete</th>
                 </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-slate-200">
+            <tbody class="divide-y divide-slate-800">
                 {% if all_users %}
                     {% for target in all_users %}
-                    <tr class="hover:bg-slate-50 transition">
-                        <td class="px-6 py-4 text-sm text-slate-400">#{{ target.id }}</td>
-                        <td class="px-6 py-4 text-sm font-bold text-slate-800">
+                    <tr class="hover:bg-slate-800/50 transition">
+                        <td class="px-6 py-4 text-sm text-slate-600 font-mono">#{{ target.id }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-slate-200">
                             {{ target.username }}
                             {% if user.username == target.username %}
-                                <span class="ml-2 bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded">YOU</span>
+                                <span class="ml-2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] px-2 py-0.5 rounded font-bold">YOU</span>
                             {% endif %}
                         </td>
-                        <td class="px-6 py-4 text-sm font-mono text-yellow-600 font-bold">
+                        <td class="px-6 py-4 text-sm font-mono text-yellow-500 font-bold">
                             💰 {{ target.balance }}
                         </td>
                         
@@ -53,8 +57,8 @@
                         <td class="px-6 py-4">
                             <form action="/admin/users/update/{{ target.id }}" method="post" class="flex items-center space-x-2">
                                 <input type="number" name="new_balance" value="{{ target.balance }}" 
-                                       class="w-24 px-2 py-1 border rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
-                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1.5 px-3 rounded shadow-sm">
+                                       class="w-24 px-2 py-1 bg-slate-950 border border-slate-700 text-white rounded text-sm focus:ring-1 focus:ring-indigo-500 outline-none">
+                                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-1.5 px-3 rounded shadow-lg shadow-indigo-900/20 transition">
                                     Save
                                 </button>
                             </form>
@@ -64,19 +68,19 @@
                         <td class="px-6 py-4 text-right">
                             {% if user.id != target.id %}
                             <form action="/admin/users/delete/{{ target.id }}" method="post" onsubmit="return confirm('Delete {{ target.username }}? This removes all their bets and cannot be undone.');">
-                                <button type="submit" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded transition">
+                                <button type="submit" class="text-rose-500 hover:text-rose-400 font-bold text-xs bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 px-3 py-1.5 rounded transition">
                                     🗑️
                                 </button>
                             </form>
                             {% else %}
-                                <span class="text-xs text-slate-400 italic">Protected</span>
+                                <span class="text-xs text-slate-600 italic">Protected</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-slate-500">
+                        <td colspan="5" class="px-6 py-12 text-center text-slate-500 border-dashed">
                             No users found matching "{{ search_query }}"
                         </td>
                     </tr>
