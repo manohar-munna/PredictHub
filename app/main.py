@@ -385,22 +385,36 @@ async def resolve_market(
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
 
 # --- NEW: USER MANAGEMENT (ADMIN ONLY) ---
+# app/main.py (Partial Update - Replace only this function)
 
 @app.get("/admin/users", response_class=HTMLResponse)
-async def admin_users_dashboard(request: Request, db: Session = Depends(get_db)):
+async def admin_users_dashboard(
+    request: Request, 
+    search: str = None,  # <--- Accept search param
+    db: Session = Depends(get_db)
+):
     user = get_current_user(request, db)
     if not is_user_admin(user):
          return HTMLResponse("Unauthorized Access", status_code=403)
     
-    all_users = db.query(models.User).order_by(models.User.id.asc()).all()
+    # Start the query
+    query = db.query(models.User)
+    
+    # If search exists, filter by username
+    if search:
+        # Use .contains() for simple substring match (case sensitive in SQLite, case insensitive in Postgres usually)
+        query = query.filter(models.User.username.contains(search))
+    
+    # Order results
+    all_users = query.order_by(models.User.id.asc()).all()
     
     return templates.TemplateResponse("admin_users.html", {
         "request": request, 
         "user": user, 
         "all_users": all_users,
-        "is_admin": True
+        "is_admin": True,
+        "search_query": search # Pass back to template to keep input filled
     })
-
 @app.post("/admin/users/update/{target_id}", response_class=RedirectResponse)
 async def admin_update_balance(
     target_id: int,
@@ -445,3 +459,4 @@ async def admin_delete_user(
         db.commit()
     
     return RedirectResponse(url="/admin/users", status_code=303)
+
