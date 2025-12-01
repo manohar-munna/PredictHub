@@ -2,111 +2,95 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="space-y-6">
+<div class="space-y-8">
     
     <!-- Header & Filters -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-        <h2 class="text-3xl font-bold text-slate-900 mb-4">📰 Neti Vaarthalu ki Swagatham</h2>
-        <p class="text-slate-500 mb-6">Stay updated to make better predictions.</p>
+    <div class="bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-800">
+        <h2 class="text-3xl font-bold text-white mb-2">📰 Live Feed</h2>
+        <p class="text-slate-400 mb-6 text-sm">Real-time headlines to help you bet smarter.</p>
         
         <!-- Filter Buttons -->
         <div class="flex flex-wrap gap-2">
-            <a href="/news?category=general" 
-               class="px-4 py-2 rounded-full text-sm font-bold transition
-               {% if current_category == 'general' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-               Top Headlines
+            {% set filters = [
+                ('general', 'Headlines'),
+                ('business', 'Business'),
+                ('technology', 'Tech & Crypto'),
+                ('sports', 'Sports'),
+                ('bollywood', 'Bollywood'),
+                ('politics', 'Politics')
+            ] %}
+            
+            {% for key, label in filters %}
+            <a href="/news?category={{ key }}" 
+               class="px-4 py-2 rounded-lg text-sm font-bold transition border
+               {% if current_category == key %}
+                   bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50
+               {% else %}
+                   bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-white hover:border-slate-600
+               {% endif %}">
+               {{ label }}
             </a>
-            <a href="/news?category=business" 
-               class="px-4 py-2 rounded-full text-sm font-bold transition
-               {% if current_category == 'business' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-               Business
-            </a>
-            <a href="/news?category=technology" 
-               class="px-4 py-2 rounded-full text-sm font-bold transition
-               {% if current_category == 'technology' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-               Tech & Crypto
-            </a>
-            <a href="/news?category=sports" 
-               class="px-4 py-2 rounded-full text-sm font-bold transition
-               {% if current_category == 'sports' %}bg-indigo-600 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
-               Sports
-            </a>
-            <a href="/news?category=bollywood" 
-               class="px-4 py-2 rounded-full text-sm font-bold transition
-               {% if current_category == 'bollywood' %}bg-pink-600 text-white{% else %}bg-pink-50 text-pink-600 hover:bg-pink-100{% endif %}">
-               Bollywood
-            </a>
-            <a href="/news?category=politics" 
-               class="px-4 py-2 rounded-full text-sm font-bold transition
-               {% if current_category == 'politics' %}bg-orange-600 text-white{% else %}bg-orange-50 text-orange-600 hover:bg-orange-100{% endif %}">
-               Politics
-            </a>
+            {% endfor %}
         </div>
     </div>
 
     <!-- Error Message -->
     {% if error %}
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-        <strong class="font-bold">Error!</strong>
-        <span class="block sm:inline">{{ error }} (Make sure NEWS_API_KEY is set in main.py)</span>
+    <div class="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg relative">
+        <strong class="font-bold">Error:</strong>
+        <span class="block sm:inline">{{ error }}</span>
     </div>
     {% endif %}
 
     <!-- News Grid -->
-    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {% for article in articles %}
         {% if article.title != "[Removed]" %}
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-lg transition flex flex-col h-full">
-            
-            <!-- Image -->
-            <div class="h-48 bg-slate-200 overflow-hidden relative">
-                {% if article.urlToImage %}
-                    <img src="{{ article.urlToImage }}" alt="News Image" class="w-full h-full object-cover">
-                {% else %}
-                    <!-- Fallback Image -->
-                    <div class="flex items-center justify-center h-full text-slate-400 bg-slate-100">
-                        <span>No Image Available</span>
-                    </div>
-                {% endif %}
-                <div class="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                    {{ article.source.name }}
-                </div>
-            </div>
-
-            <!-- Content -->
-            <div class="p-5 flex-grow flex flex-col justify-between">
-                <div>
-                    <h3 class="font-bold text-lg text-slate-900 leading-snug mb-2 hover:text-indigo-600">
-                        <a href="{{ article.url }}" target="_blank">{{ article.title }}</a>
-                    </h3>
-                    <p class="text-sm text-slate-500 line-clamp-3 mb-4">
-                        {{ article.description or "Click to read full story..." }}
-                    </p>
-                </div>
+        <a href="{{ article.url }}" target="_blank" class="group h-full">
+            <div class="bg-slate-900 border border-slate-800 hover:border-indigo-500/50 rounded-xl overflow-hidden hover:shadow-xl hover:shadow-black/50 transition duration-300 h-full flex flex-col">
                 
-                <div class="flex justify-between items-center pt-4 border-t border-slate-100">
-                    <span class="text-xs text-slate-400">
-                        {{ article.publishedAt[:10] }}
-                    </span>
-                    <a href="{{ article.url }}" target="_blank" class="text-sm font-bold text-indigo-600 hover:underline">
-                        Read More &rarr;
-                    </a>
+                <!-- Image -->
+                <div class="h-40 bg-slate-800 overflow-hidden relative">
+                    {% if article.urlToImage %}
+                        <img src="{{ article.urlToImage }}" alt="News" class="w-full h-full object-cover group-hover:scale-105 transition duration-500 opacity-90 group-hover:opacity-100">
+                    {% else %}
+                        <div class="flex items-center justify-center h-full text-slate-600 bg-slate-950">
+                            <span class="text-xs uppercase font-bold tracking-widest">No Image</span>
+                        </div>
+                    {% endif %}
+                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900 to-transparent h-12"></div>
+                    <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-1 rounded border border-white/10">
+                        {{ article.source.name }}
+                    </div>
+                </div>
+
+                <!-- Content -->
+                <div class="p-5 flex-grow flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-base text-slate-200 leading-snug mb-3 group-hover:text-indigo-400 transition line-clamp-3">
+                            {{ article.title }}
+                        </h3>
+                    </div>
+                    
+                    <div class="flex justify-between items-center pt-4 border-t border-slate-800 mt-4">
+                        <span class="text-xs text-slate-500 font-mono">
+                            {{ article.publishedAt[:10] }}
+                        </span>
+                        <span class="text-xs font-bold text-indigo-500 group-hover:underline">
+                            Read &rarr;
+                        </span>
+                    </div>
                 </div>
             </div>
-
-        </div>
+        </a>
         {% endif %}
         {% else %}
             {% if not error %}
-            <div class="col-span-full text-center py-12 text-slate-500">
-                No articles found for this category.
+            <div class="col-span-full text-center py-20 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
+                <p class="text-slate-500">No news found in this category right now.</p>
             </div>
             {% endif %}
         {% endfor %}
-    </div>
-
-    <div class="text-center text-xs text-slate-400 mt-8">
-        News provided by <a href="https://newsapi.org" target="_blank" class="underline">NewsAPI.org</a>
     </div>
 
 </div>
