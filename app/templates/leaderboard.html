@@ -2,34 +2,45 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto text-center space-y-8">
+<div class="max-w-3xl mx-auto space-y-8">
     
-    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-8 rounded-xl shadow-lg">
-        <h2 class="text-4xl font-extrabold mb-2">🏆 Richest Predictors</h2>
-        <p class="text-indigo-100">Who has the biggest wallet?</p>
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-indigo-900 to-slate-900 border border-indigo-500/30 p-8 rounded-2xl shadow-xl text-center relative overflow-hidden">
+        <!-- Glow effect -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-indigo-500/20 blur-[80px] rounded-full pointer-events-none"></div>
+        
+        <h2 class="text-4xl font-extrabold mb-2 text-white relative z-10">🏆 Leaderboard</h2>
+        <p class="text-indigo-200 relative z-10">Top traders by total wallet balance.</p>
     </div>
 
-    <div class="bg-white rounded-xl shadow border border-slate-200 overflow-hidden">
+    <!-- Table Container -->
+    <div class="bg-slate-900 rounded-xl shadow-lg border border-slate-800 overflow-hidden">
         <table class="w-full text-left">
-            <thead class="bg-slate-50 text-slate-500 uppercase text-xs font-bold border-b">
+            <thead class="bg-slate-950/50 text-slate-400 uppercase text-xs font-bold border-b border-slate-800">
                 <tr>
-                    <th class="px-6 py-4">Rank</th>
-                    <th class="px-6 py-4">User</th>
-                    <th class="px-6 py-4 text-right">Balance</th>
+                    <th class="px-6 py-4 tracking-wider">Rank</th>
+                    <th class="px-6 py-4 tracking-wider">User</th>
+                    <th class="px-6 py-4 text-right tracking-wider">Net Worth</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100">
+            <tbody class="divide-y divide-slate-800">
                 {% for player in top_users %}
-                <tr class="hover:bg-slate-50 transition">
-                    <td class="px-6 py-4 font-bold text-slate-400">#{{ loop.index }}</td>
-                    <td class="px-6 py-4 font-medium text-slate-800 flex items-center gap-2">
-                        {% if loop.index == 1 %}👑{% endif %}
+                <tr class="hover:bg-slate-800/50 transition duration-150 group">
+                    <td class="px-6 py-4 font-bold text-slate-500 group-hover:text-slate-300">
+                        {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}
+                    </td>
+                    <td class="px-6 py-4 font-medium text-slate-200 flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs border border-slate-700">
+                            {{ player.username[:2] | upper }}
+                        </div>
                         {{ player.username }}
                         {% if user and user.id == player.id %}
-                            <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full ml-2">You</span>
+                            <span class="text-[10px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-bold">YOU</span>
                         {% endif %}
                     </td>
-                    <td class="px-6 py-4 text-right font-bold text-yellow-600">💰 {{ player.balance }}</td>
+                    <td class="px-6 py-4 text-right font-mono font-bold text-yellow-500">
+                        💰 {{ player.balance }}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
