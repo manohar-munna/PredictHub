@@ -60,6 +60,55 @@ def get_db():
     finally:
         db.close()
 
+# app/main.py
+
+# ... existing imports ...
+
+# --- NEW: GLOBAL CHAT ROUTE ---
+@app.post("/api/global-chat")
+async def global_chat_ai(message: str = Form(...), db: Session = Depends(get_db)):
+    """
+    General AI Assistant that floats on every page.
+    """
+    if not client:
+        return JSONResponse({"content": "⚠️ AI is sleeping (Check API Key)."})
+
+    # Context about the website for the AI
+    system_prompt = """
+    You are 'Oracle', the witty AI assistant for PredictHub.
+    
+    YOUR KNOWLEDGE BASE:
+    1. **Markets** (/markets): Where users bet coins on Yes/No outcomes.
+    2. **Leaderboard** (/leaderboard): Rankings of richest traders.
+    3. **News** (/news): Real-time financial and crypto news.
+    4. **Profile** (/profile): Where users check their balance and history.
+    
+    YOUR PERSONALITY:
+    - You are a crypto-native degens' best friend.
+    - You use emojis.
+    - If asked for advice, give a funny but logical take.
+    - Keep answers short (under 2 sentences).
+    
+    GOAL:
+    Help the user navigate or entertain them. If they ask "Where can I bet?", tell them to go to /markets.
+    """
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message}
+            ],
+            model="llama3-8b-8192", # Fast & Free
+            temperature=0.7
+        )
+        return JSONResponse({"content": chat_completion.choices[0].message.content})
+    except Exception as e:
+        print(f"AI Error: {e}")
+        return JSONResponse({"content": "⚠️ Connection interrupt. Try again."})
+
+# ... existing routes ...
+
 # --- Config & Paths ---
 BASE_DIR = Path(__file__).resolve().parent
 app.add_middleware(SessionMiddleware, secret_key="super-secret-temporary-key")
