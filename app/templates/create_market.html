@@ -2,67 +2,58 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto mt-8 px-4">
+<div class="max-w-xl mx-auto bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-800">
     
-    <!-- Main Card -->
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden">
-        
-        <!-- Decorative Accent Line -->
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500"></div>
+    <h2 class="text-2xl font-bold mb-6 text-white">Create New Market</h2>
 
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold text-white tracking-tight">Create Market</h2>
-            <p class="text-slate-400 text-sm mt-2">Launch a new prediction event for the community to trade on.</p>
+    <form action="/admin/create" method="post" class="space-y-6">
+        
+        <!-- Question -->
+        <div>
+            <label for="question" class="block text-sm font-medium text-slate-400 mb-1">
+                Question
+            </label>
+            <input type="text" name="question" id="question" required
+                placeholder="e.g., Will Bitcoin hit $100k?"
+                class="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white focus:ring-1 focus:ring-indigo-500 outline-none">
         </div>
 
-        <form action="/admin/create" method="post" class="space-y-6">
-            
-            <!-- Question Input -->
-            <div class="space-y-2">
-                <label for="question" class="block text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    Question
-                </label>
-                <input type="text" name="question" id="question" required autofocus
-                    placeholder="e.g., Will Bitcoin cross $100k in 2025?"
-                    class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder-slate-600 transition shadow-inner text-lg">
-            </div>
-
-            <!-- Category Dropdown -->
-            <div class="space-y-2">
-                <label for="category" class="block text-xs font-bold text-slate-500 uppercase tracking-widest">
-                    Category
-                </label>
-                <div class="relative">
-                    <select name="category" id="category" 
-                            class="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-4 py-4 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner cursor-pointer text-base">
-                        <option value="General">General</option>
-                        <option value="Sports">Sports</option>
-                        <option value="Crypto">Crypto</option>
-                        <option value="Politics">Politics</option>
-                        <option value="Tech">Tech</option>
-                        <option value="Weather">Weather</option>
-                    </select>
-                    <!-- Custom Chevron Icon -->
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                        <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Submit Button -->
-            <div class="pt-6">
-                <button type="submit" 
-                    class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-900/40 transition transform hover:-translate-y-0.5 active:scale-[0.99] border border-indigo-500">
-                    🚀 Publish Market
-                </button>
-            </div>
-
-        </form>
-        
-        <div class="mt-6 text-center border-t border-slate-800 pt-6">
-            <a href="/markets" class="text-sm text-slate-500 hover:text-white transition font-medium">Cancel & Return</a>
+        <!-- NEW: Description -->
+        <div>
+            <label for="description" class="block text-sm font-medium text-slate-400 mb-1">
+                Description / Rules
+            </label>
+            <textarea name="description" id="description" rows="3" required
+                placeholder="Details about resolution source, dates, etc."
+                class="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none"></textarea>
         </div>
 
+        <!-- Category -->
+        <div>
+            <label for="category" class="block text-sm font-medium text-slate-400 mb-1">
+                Category
+            </label>
+            <select name="category" id="category" class="w-full px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white focus:ring-1 focus:ring-indigo-500 outline-none">
+                <option value="General">General</option>
+                <option value="Sports">Sports</option>
+                <option value="Crypto">Crypto</option>
+                <option value="Politics">Politics</option>
+                <option value="Tech">Tech</option>
+                <option value="Weather">Weather</option>
+            </select>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" 
+            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow-lg transition">
+            Publish Market
+        </button>
+
+    </form>
+    
+    <div class="mt-4 text-center">
+        <a href="/markets" class="text-sm text-slate-500 hover:text-white transition">Cancel</a>
     </div>
+
 </div>
 {% endblock %}

@@ -18,10 +18,8 @@ from . import models, database
 app = FastAPI(title="PredictHub")
 
 # --- CONFIGURATION ---
-
-# Get secrets from Environment (Vercel)
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_API_KEY_HERE")
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin") # Defaults to 'admin' if not set
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 
 # --- CACHING SETUP ---
 NEWS_CACHE = {
@@ -31,7 +29,6 @@ NEWS_CACHE = {
 CACHE_TIMEOUT = 900 # 15 Minutes
 
 # --- Security Setup ---
-
 def get_password_hash(password):
     pwd_bytes = password.encode('utf-8')
     salt = bcrypt.gensalt()
@@ -68,7 +65,6 @@ def get_current_user(request: Request, db: Session):
 
 # --- Helper: Check if Admin ---
 def is_user_admin(user: models.User):
-    # Returns True if user is logged in AND their username matches the Env Var
     return user and user.username == ADMIN_USERNAME
 
 def calculate_percentages(market):
@@ -90,15 +86,22 @@ async def read_home(request: Request, db: Session = Depends(get_db)):
         "is_admin": is_user_admin(user)
     })
 
+# --- NEWS ROUTE (With Refresh) ---
 @app.get("/news", response_class=HTMLResponse)
-def read_news(request: Request, category: str = "general", db: Session = Depends(get_db)):
+def read_news(request: Request, category: str = "general", refresh: bool = False, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     
     current_time = time.time()
     articles = []
     error = None
 
-    # Cache Logic
+    # Force Refresh Logic
+    if refresh:
+        print(f"🔄 Forcing refresh for {category}")
+        if category in NEWS_CACHE["data"]:
+            del NEWS_CACHE["data"][category]
+
+    # Check Cache
     if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
         articles = NEWS_CACHE["data"][category]
     else:
@@ -218,20 +221,15 @@ async def leaderboard_page(request: Request, db: Session = Depends(get_db)):
     })
 
 # --- MARKET ROUTES ---
-# In app/main.py
 
 @app.get("/markets", response_class=HTMLResponse)
 async def read_markets(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    
-    # SORTING LOGIC FIXED:
-    # 1. models.Market.is_open.desc() -> Puts 'True' (Open) before 'False' (Closed)
-    # 2. models.Market.id.desc() -> Puts newest created markets first
+    # Sort by Open first, then ID
     markets = db.query(models.Market).order_by(
         models.Market.is_open.desc(), 
         models.Market.id.desc()
     ).all()
-    
     return templates.TemplateResponse("markets.html", {
         "request": request,
         "markets": markets,
@@ -258,6 +256,11 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
             previous_wager = existing_vote.wager
     
     yes_pct, no_pct = calculate_percentages(market)
+    
+    # NEW: Fetch Comments
+    comments = db.query(models.Comment).filter(
+        models.Comment.market_id == market_id
+    ).order_by(models.Comment.timestamp.desc()).all()
 
     return templates.TemplateResponse("predict.html", {
         "request": request,
@@ -267,7 +270,8 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
         "yes_pct": yes_pct,
         "no_pct": no_pct,
         "user": user,
-        "is_admin": is_user_admin(user)
+        "is_admin": is_user_admin(user),
+        "comments": comments # Pass comments to template
     })
 
 @app.post("/predict/{market_id}", response_class=HTMLResponse)
@@ -319,6 +323,9 @@ async def submit_prediction(
     
     yes_pct, no_pct = calculate_percentages(market)
     
+    # Re-fetch comments to show on error/success page
+    comments = db.query(models.Comment).filter(models.Comment.market_id == market_id).order_by(models.Comment.timestamp.desc()).all()
+    
     return templates.TemplateResponse("predict.html", {
         "request": request,
         "market": market,
@@ -328,10 +335,34 @@ async def submit_prediction(
         "no_pct": no_pct,
         "user": user,
         "message": f"Bet placed! {wager} coins deducted.",
-        "is_admin": is_user_admin(user)
+        "is_admin": is_user_admin(user),
+        "comments": comments
     })
 
-# --- ADMIN ROUTES (SECURED) ---
+# --- NEW: POST COMMENT ROUTE ---
+@app.post("/predict/{market_id}/comment", response_class=RedirectResponse)
+async def post_comment(
+    market_id: int,
+    content: str = Form(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    user = get_current_user(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    if content.strip():
+        new_comment = models.Comment(
+            content=content,
+            user_id=user.id,
+            market_id=market_id
+        )
+        db.add(new_comment)
+        db.commit()
+    
+    return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
+
+# --- ADMIN ROUTES ---
 
 @app.get("/admin/create", response_class=HTMLResponse)
 async def create_market_page(request: Request, db: Session = Depends(get_db)):
@@ -345,6 +376,7 @@ async def create_market_page(request: Request, db: Session = Depends(get_db)):
 async def create_market_submit(
     request: Request,
     question: str = Form(...),
+    description: str = Form(...), # <--- NEW: Accept description
     category: str = Form(...),
     db: Session = Depends(get_db)
 ):
@@ -352,7 +384,12 @@ async def create_market_submit(
     if not is_user_admin(user):
         return HTMLResponse("Unauthorized", status_code=403)
 
-    new_market = models.Market(question=question, category=category, is_open=True)
+    new_market = models.Market(
+        question=question, 
+        description=description, # Save it
+        category=category, 
+        is_open=True
+    )
     db.add(new_market)
     db.commit()
     return RedirectResponse(url="/markets", status_code=303)
@@ -393,28 +430,20 @@ async def resolve_market(
         
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
 
-# --- NEW: USER MANAGEMENT (ADMIN ONLY) ---
-# app/main.py (Partial Update - Replace only this function)
-
 @app.get("/admin/users", response_class=HTMLResponse)
 async def admin_users_dashboard(
     request: Request, 
-    search: str = None,  # <--- Accept search param
+    search: str = None,
     db: Session = Depends(get_db)
 ):
     user = get_current_user(request, db)
     if not is_user_admin(user):
          return HTMLResponse("Unauthorized Access", status_code=403)
     
-    # Start the query
     query = db.query(models.User)
-    
-    # If search exists, filter by username
     if search:
-        # Use .contains() for simple substring match (case sensitive in SQLite, case insensitive in Postgres usually)
         query = query.filter(models.User.username.contains(search))
     
-    # Order results
     all_users = query.order_by(models.User.id.asc()).all()
     
     return templates.TemplateResponse("admin_users.html", {
@@ -422,8 +451,9 @@ async def admin_users_dashboard(
         "user": user, 
         "all_users": all_users,
         "is_admin": True,
-        "search_query": search # Pass back to template to keep input filled
+        "search_query": search
     })
+
 @app.post("/admin/users/update/{target_id}", response_class=RedirectResponse)
 async def admin_update_balance(
     target_id: int,
@@ -461,12 +491,10 @@ async def admin_delete_user(
 
     target_user = db.query(models.User).filter(models.User.id == target_id).first()
     if target_user:
-        # Delete related data manually to prevent FK errors
         db.query(models.Vote).filter(models.Vote.user_id == target_id).delete()
         db.query(models.Transaction).filter(models.Transaction.user_id == target_id).delete()
+        db.query(models.Comment).filter(models.Comment.user_id == target_id).delete() # Delete comments too
         db.delete(target_user)
         db.commit()
     
     return RedirectResponse(url="/admin/users", status_code=303)
-
-
