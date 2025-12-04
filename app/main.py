@@ -99,7 +99,7 @@ async def global_chat_ai(message: str = Form(...), db: Session = Depends(get_db)
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message}
             ],
-            model="llama3-8b-8192", # Fast & Free
+            model="llama-3.3-70b-versatile", # Fast & Free
             temperature=0.7
         )
         return JSONResponse({"content": chat_completion.choices[0].message.content})
