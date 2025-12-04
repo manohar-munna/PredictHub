@@ -20,7 +20,7 @@ app = FastAPI(title="PredictHub")
 
 # --- CONFIGURATION ---
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "") # <--- NEW KEY
+GROQ_API_KEY =os.getenv("GROQ_API_KEY")# <--- NEW KEY
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 
 # --- AI CLIENT SETUP ---
