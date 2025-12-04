@@ -1,7 +1,7 @@
 # app/main.py
 
 from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
@@ -12,21 +12,31 @@ from datetime import datetime
 import requests
 import time
 import os 
+from groq import Groq # <--- NEW IMPORT
 
 from . import models, database
 
 app = FastAPI(title="PredictHub")
 
 # --- CONFIGURATION ---
-NEWS_API_KEY = os.getenv("NEWS_API_KEY", "YOUR_API_KEY_HERE")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "") # <--- NEW KEY
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+
+# --- AI CLIENT SETUP ---
+client = None
+if GROQ_API_KEY:
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+    except:
+        print("Groq Client failed to initialize")
 
 # --- CACHING SETUP ---
 NEWS_CACHE = {
     "data": {},
     "last_fetched": {} 
 }
-CACHE_TIMEOUT = 900 # 15 Minutes
+CACHE_TIMEOUT = 900 
 
 # --- Security Setup ---
 def get_password_hash(password):
@@ -75,6 +85,41 @@ def calculate_percentages(market):
     no_pct = 100 - yes_pct 
     return yes_pct, no_pct
 
+# --- NEW: AI ANALYSIS ROUTE ---
+@app.post("/api/analyze/{market_id}")
+async def analyze_market_ai(market_id: int, db: Session = Depends(get_db)):
+    """
+    Uses Groq Llama3 to analyze the market question.
+    """
+    if not client:
+        return JSONResponse({"content": "⚠️ AI is currently offline (API Key missing)."})
+
+    market = db.query(models.Market).filter(models.Market.id == market_id).first()
+    if not market:
+        return JSONResponse({"content": "Market not found."})
+
+    # Prepare the prompt
+    prompt = f"""
+    You are a professional prediction market analyst (like on Polymarket).
+    Market Question: "{market.question}"
+    Description: "{market.description}"
+    Category: {market.category}
+    Current Pool: {market.yes_pool + market.no_pool} coins.
+    
+    Provide a concise, 2-3 sentence analysis of this event. 
+    Focus on probabilities or key news factors to consider. 
+    Do not be neutral—sound like a smart crypto trader.
+    """
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama3-8b-8192", 
+        )
+        return JSONResponse({"content": chat_completion.choices[0].message.content})
+    except Exception as e:
+        return JSONResponse({"content": "⚠️ AI Analysis failed. Try again later."})
+
 # --- ROUTES ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -86,7 +131,6 @@ async def read_home(request: Request, db: Session = Depends(get_db)):
         "is_admin": is_user_admin(user)
     })
 
-# --- NEWS ROUTE (With Refresh) ---
 @app.get("/news", response_class=HTMLResponse)
 def read_news(request: Request, category: str = "general", refresh: bool = False, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
@@ -95,13 +139,9 @@ def read_news(request: Request, category: str = "general", refresh: bool = False
     articles = []
     error = None
 
-    # Force Refresh Logic
-    if refresh:
-        print(f"🔄 Forcing refresh for {category}")
-        if category in NEWS_CACHE["data"]:
-            del NEWS_CACHE["data"][category]
+    if refresh and category in NEWS_CACHE["data"]:
+        del NEWS_CACHE["data"][category]
 
-    # Check Cache
     if category in NEWS_CACHE["data"] and (current_time - NEWS_CACHE["last_fetched"].get(category, 0) < CACHE_TIMEOUT):
         articles = NEWS_CACHE["data"][category]
     else:
@@ -225,7 +265,6 @@ async def leaderboard_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/markets", response_class=HTMLResponse)
 async def read_markets(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
-    # Sort by Open first, then ID
     markets = db.query(models.Market).order_by(
         models.Market.is_open.desc(), 
         models.Market.id.desc()
@@ -257,7 +296,6 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
     
     yes_pct, no_pct = calculate_percentages(market)
     
-    # NEW: Fetch Comments
     comments = db.query(models.Comment).filter(
         models.Comment.market_id == market_id
     ).order_by(models.Comment.timestamp.desc()).all()
@@ -271,7 +309,10 @@ async def read_predict(request: Request, market_id: int, db: Session = Depends(g
         "no_pct": no_pct,
         "user": user,
         "is_admin": is_user_admin(user),
-        "comments": comments # Pass comments to template
+        "comments": comments,
+        # NEW: Pass pool data for JS Calculator
+        "yes_pool": market.yes_pool,
+        "no_pool": market.no_pool
     })
 
 @app.post("/predict/{market_id}", response_class=HTMLResponse)
@@ -322,8 +363,6 @@ async def submit_prediction(
     db.refresh(market)
     
     yes_pct, no_pct = calculate_percentages(market)
-    
-    # Re-fetch comments to show on error/success page
     comments = db.query(models.Comment).filter(models.Comment.market_id == market_id).order_by(models.Comment.timestamp.desc()).all()
     
     return templates.TemplateResponse("predict.html", {
@@ -336,10 +375,11 @@ async def submit_prediction(
         "user": user,
         "message": f"Bet placed! {wager} coins deducted.",
         "is_admin": is_user_admin(user),
-        "comments": comments
+        "comments": comments,
+        "yes_pool": market.yes_pool,
+        "no_pool": market.no_pool
     })
 
-# --- NEW: POST COMMENT ROUTE ---
 @app.post("/predict/{market_id}/comment", response_class=RedirectResponse)
 async def post_comment(
     market_id: int,
@@ -352,14 +392,9 @@ async def post_comment(
         return RedirectResponse(url="/login", status_code=303)
     
     if content.strip():
-        new_comment = models.Comment(
-            content=content,
-            user_id=user.id,
-            market_id=market_id
-        )
+        new_comment = models.Comment(content=content, user_id=user.id, market_id=market_id)
         db.add(new_comment)
         db.commit()
-    
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
 
 # --- ADMIN ROUTES ---
@@ -376,7 +411,7 @@ async def create_market_page(request: Request, db: Session = Depends(get_db)):
 async def create_market_submit(
     request: Request,
     question: str = Form(...),
-    description: str = Form(...), # <--- NEW: Accept description
+    description: str = Form(...),
     category: str = Form(...),
     db: Session = Depends(get_db)
 ):
@@ -384,12 +419,7 @@ async def create_market_submit(
     if not is_user_admin(user):
         return HTMLResponse("Unauthorized", status_code=403)
 
-    new_market = models.Market(
-        question=question, 
-        description=description, # Save it
-        category=category, 
-        is_open=True
-    )
+    new_market = models.Market(question=question, description=description, category=category, is_open=True)
     db.add(new_market)
     db.commit()
     return RedirectResponse(url="/markets", status_code=303)
@@ -431,11 +461,7 @@ async def resolve_market(
     return RedirectResponse(url=f"/predict/{market_id}", status_code=303)
 
 @app.get("/admin/users", response_class=HTMLResponse)
-async def admin_users_dashboard(
-    request: Request, 
-    search: str = None,
-    db: Session = Depends(get_db)
-):
+async def admin_users_dashboard(request: Request, search: str = None, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not is_user_admin(user):
          return HTMLResponse("Unauthorized Access", status_code=403)
@@ -443,23 +469,16 @@ async def admin_users_dashboard(
     query = db.query(models.User)
     if search:
         query = query.filter(models.User.username.contains(search))
-    
     all_users = query.order_by(models.User.id.asc()).all()
     
     return templates.TemplateResponse("admin_users.html", {
-        "request": request, 
-        "user": user, 
-        "all_users": all_users,
-        "is_admin": True,
-        "search_query": search
+        "request": request, "user": user, "all_users": all_users,
+        "is_admin": True, "search_query": search
     })
 
 @app.post("/admin/users/update/{target_id}", response_class=RedirectResponse)
 async def admin_update_balance(
-    target_id: int,
-    new_balance: int = Form(...),
-    request: Request = None,
-    db: Session = Depends(get_db)
+    target_id: int, new_balance: int = Form(...), request: Request = None, db: Session = Depends(get_db)
 ):
     user = get_current_user(request, db)
     if not is_user_admin(user):
@@ -473,19 +492,13 @@ async def admin_update_balance(
             txn = models.Transaction(user_id=target_user.id, amount=diff, description="Admin adjustment 🛠️")
             db.add(txn)
         db.commit()
-    
     return RedirectResponse(url="/admin/users", status_code=303)
 
 @app.post("/admin/users/delete/{target_id}", response_class=RedirectResponse)
-async def admin_delete_user(
-    target_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
+async def admin_delete_user(target_id: int, request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not is_user_admin(user):
         return HTMLResponse("Unauthorized", status_code=403)
-
     if user.id == target_id:
         return RedirectResponse(url="/admin/users", status_code=303)
 
@@ -493,8 +506,7 @@ async def admin_delete_user(
     if target_user:
         db.query(models.Vote).filter(models.Vote.user_id == target_id).delete()
         db.query(models.Transaction).filter(models.Transaction.user_id == target_id).delete()
-        db.query(models.Comment).filter(models.Comment.user_id == target_id).delete() # Delete comments too
+        db.query(models.Comment).filter(models.Comment.user_id == target_id).delete()
         db.delete(target_user)
         db.commit()
-    
     return RedirectResponse(url="/admin/users", status_code=303)

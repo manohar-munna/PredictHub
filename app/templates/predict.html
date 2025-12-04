@@ -4,16 +4,19 @@
 {% block content %}
 <div class="grid lg:grid-cols-3 gap-8">
     
-    <!-- LEFT: Market Details & Betting (Takes 2/3 space) -->
+    <!-- LEFT: Market Details & Betting -->
     <div class="lg:col-span-2 space-y-6">
         
         <a href="/markets" class="text-slate-400 hover:text-white text-sm font-bold inline-block">&larr; Back to Markets</a>
 
         {% if market %}
-            <div class="bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-800">
+            <div class="bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-800 relative overflow-hidden">
                 
+                <!-- Background Decoration -->
+                <div class="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+
                 <!-- Header -->
-                <div class="flex justify-between items-start mb-4">
+                <div class="flex justify-between items-start mb-4 relative z-10">
                     <span class="text-xs font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded">
                         {{ market.category }}
                     </span>
@@ -24,18 +27,30 @@
                     {% endif %}
                 </div>
 
-                <h2 class="text-2xl md:text-3xl font-bold mb-4 text-white leading-tight">{{ market.question }}</h2>
+                <h2 class="text-2xl md:text-3xl font-bold mb-4 text-white leading-tight relative z-10">{{ market.question }}</h2>
                 
-                <!-- NEW: Description Area -->
-                <div class="text-slate-400 text-sm mb-8 bg-slate-950/50 p-4 rounded-lg border border-slate-800 leading-relaxed">
-                    {{ market.description or "No additional details provided." }}
+                <!-- AI & Description -->
+                <div class="grid md:grid-cols-2 gap-4 mb-8">
+                    <!-- Description -->
+                    <div class="text-slate-400 text-sm bg-slate-950/50 p-4 rounded-lg border border-slate-800 leading-relaxed">
+                        {{ market.description or "No additional details provided." }}
+                    </div>
+                    
+                    <!-- AI BOT CARD -->
+                    <div class="bg-gradient-to-br from-slate-900 to-indigo-950/30 p-4 rounded-lg border border-indigo-500/20 relative">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-indigo-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1">
+                                🤖 Market Oracle
+                            </h4>
+                            <button onclick="askAI({{ market.id }})" id="ai-btn" class="text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition">
+                                Analyze
+                            </button>
+                        </div>
+                        <p id="ai-content" class="text-slate-300 text-sm italic leading-relaxed">
+                            "Click Analyze to generate an AI prediction based on market data..."
+                        </p>
+                    </div>
                 </div>
-
-                {% if message %}
-                <div class="mb-6 bg-indigo-500/20 border border-indigo-500/50 text-indigo-200 px-4 py-3 rounded text-center text-sm">
-                    {{ message }}
-                </div>
-                {% endif %}
 
                 <!-- MONEY BAR -->
                 <div class="mb-8">
@@ -48,7 +63,7 @@
                         <div class="bg-rose-500 h-4 transition-all duration-500" style="width: {{ no_pct }}%"></div>
                     </div>
                     <div class="text-center mt-2 text-xs text-slate-500">
-                        Total Volume: <span class="text-slate-300 font-mono">{{ market.yes_pool + market.no_pool }}</span> coins
+                        Total Volume: <span class="text-slate-300 font-mono">{{ yes_pool + no_pool }}</span> coins
                     </div>
                 </div>
 
@@ -66,12 +81,25 @@
                             </div>
                         {% else %}
                             {% if user %}
+                                <!-- BETTING FORM WITH CALCULATOR -->
                                 <p class="mb-4 text-slate-400 text-sm">Place your bet (Balance: <span class="text-yellow-500 font-bold">{{ user.balance }}</span>)</p>
+                                
                                 <form method="post" class="space-y-4 max-w-sm mx-auto">
                                     <div class="flex justify-center items-center space-x-2 bg-slate-950 p-1 rounded-lg border border-slate-700">
-                                        <input type="number" name="wager" min="1" max="{{ user.balance }}" value="50" required
-                                               class="w-full px-4 py-2 bg-transparent text-white text-center font-bold outline-none placeholder-slate-600">
+                                        <input type="number" id="wager-input" name="wager" min="1" max="{{ user.balance }}" value="50" required
+                                               class="w-full px-4 py-2 bg-transparent text-white text-center font-bold outline-none placeholder-slate-600"
+                                               oninput="calculatePayout()">
                                         <span class="text-xs font-bold text-slate-500 pr-4">COINS</span>
+                                    </div>
+
+                                    <!-- DYNAMIC CALCULATOR DISPLAY -->
+                                    <div class="grid grid-cols-2 gap-4 text-xs">
+                                        <div class="text-emerald-400/80">
+                                            If Yes wins: <span id="payout-yes" class="font-bold text-emerald-400 text-sm">...</span>
+                                        </div>
+                                        <div class="text-rose-400/80">
+                                            If No wins: <span id="payout-no" class="font-bold text-rose-400 text-sm">...</span>
+                                        </div>
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-4 pt-2">
@@ -99,7 +127,6 @@
                                 {% if market.result == 'yes' %}text-emerald-500{% else %}text-rose-500{% endif %}">
                                 {{ market.result }} WON
                             </p>
-                            
                             {% if previous_choice %}
                                 <p class="mt-4 text-sm font-medium text-slate-400">
                                     You bet on <span class="uppercase font-bold">{{ previous_choice }}</span>.
@@ -144,14 +171,13 @@
                 <h3 class="font-bold text-white">Discussion 💬</h3>
             </div>
             
-            <!-- Comment List (Scrollable) -->
             <div class="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 {% if comments %}
                     {% for comment in comments %}
                     <div class="flex flex-col space-y-1">
                         <div class="flex items-center space-x-2">
                             <span class="text-xs font-bold text-slate-300">{{ comment.user.username }}</span>
-                            {% if comment.user.username == 'manohar' %} <!-- Simple Admin Check Visual -->
+                            {% if comment.user.username == 'manohar' %}
                                 <span class="text-[8px] bg-yellow-500/20 text-yellow-500 px-1 rounded">ADMIN</span>
                             {% endif %}
                             <span class="text-[10px] text-slate-600">{{ comment.timestamp.strftime('%H:%M') }}</span>
@@ -162,30 +188,81 @@
                     </div>
                     {% endfor %}
                 {% else %}
-                    <div class="text-center text-slate-600 text-sm py-10">
-                        No comments yet.<br>Be the first!
-                    </div>
+                    <div class="text-center text-slate-600 text-sm py-10">No comments yet.</div>
                 {% endif %}
             </div>
 
-            <!-- Post Form -->
             <div class="p-4 border-t border-slate-800 bg-slate-900 rounded-b-xl">
                 {% if user %}
                 <form action="/predict/{{ market.id }}/comment" method="post" class="flex gap-2">
                     <input type="text" name="content" placeholder="Type a message..." required autocomplete="off"
                            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg transition">
-                        ➤
-                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded-lg transition">➤</button>
                 </form>
                 {% else %}
-                <p class="text-center text-xs text-slate-500">
-                    <a href="/login" class="text-indigo-400 hover:underline">Login</a> to chat.
-                </p>
+                <p class="text-center text-xs text-slate-500"><a href="/login" class="text-indigo-400 hover:underline">Login</a> to chat.</p>
                 {% endif %}
             </div>
         </div>
     </div>
 
 </div>
+
+<!-- JAVASCRIPT FOR CALCULATOR & AI -->
+<script>
+    const currentYesPool = {{ yes_pool }};
+    const currentNoPool = {{ no_pool }};
+
+    function calculatePayout() {
+        const input = document.getElementById('wager-input');
+        const wager = parseFloat(input.value);
+        
+        if (isNaN(wager) || wager <= 0) {
+            document.getElementById('payout-yes').innerText = "...";
+            document.getElementById('payout-no').innerText = "...";
+            return;
+        }
+
+        // Logic: Payout = (Wager / TotalWinnerPool) * TotalPool
+        
+        const totalPoolYes = currentYesPool + currentNoPool + wager;
+        const newYesPool = currentYesPool + wager;
+        const shareYes = wager / newYesPool;
+        const payoutYes = Math.floor(shareYes * totalPoolYes);
+        const profitYes = payoutYes - wager;
+
+        const totalPoolNo = currentYesPool + currentNoPool + wager;
+        const newNoPool = currentNoPool + wager;
+        const shareNo = wager / newNoPool;
+        const payoutNo = Math.floor(shareNo * totalPoolNo);
+        const profitNo = payoutNo - wager;
+
+        document.getElementById('payout-yes').innerText = `${payoutYes} (+${profitYes})`;
+        document.getElementById('payout-no').innerText = `${payoutNo} (+${profitNo})`;
+    }
+
+    {% if user %}calculatePayout();{% endif %}
+
+    async function askAI(marketId) {
+        const btn = document.getElementById('ai-btn');
+        const content = document.getElementById('ai-content');
+        
+        btn.innerText = "Thinking...";
+        btn.disabled = true;
+        content.innerText = "Analyzing market data...";
+        
+        try {
+            const response = await fetch(`/api/analyze/${marketId}`, { method: 'POST' });
+            const data = await response.json();
+            content.innerText = data.content;
+            content.classList.remove('italic');
+            content.classList.add('text-white');
+        } catch (error) {
+            content.innerText = "AI is currently overloaded. Try again later.";
+        }
+        
+        btn.innerText = "Analyze";
+        btn.disabled = false;
+    }
+</script>
 {% endblock %}
