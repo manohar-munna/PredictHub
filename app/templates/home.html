@@ -30,22 +30,33 @@
     </div>
 
     <!-- LIVE TICKER (Static Visual) -->
+    <!-- LIVE TICKER -->
+    <!-- On mobile: grid-cols-2 (Shows 2x2 grid) -->
+    <!-- On desktop: md:grid-cols-4 (Shows 1x4 row) -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 border-y border-slate-800 py-8 bg-slate-900/30">
-        <div class="text-center border-r border-slate-800 last:border-0">
+        
+        <!-- Item 1: Top Left on Mobile -->
+        <div class="text-center md:border-r border-slate-800">
             <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-1">Total Volume</p>
             <p class="text-2xl font-mono text-white">10,243</p>
         </div>
-        <div class="text-center border-r border-slate-800 last:border-0">
+
+        <!-- Item 2: Top Right on Mobile -->
+        <div class="text-center md:border-r border-slate-800">
             <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-1">Active Traders</p>
             <p class="text-2xl font-mono text-white">45</p>
         </div>
-        <div class="text-center border-r border-slate-800 last:border-0 hidden md:block">
+
+        <!-- Item 3: Bottom Left on Mobile (Previously Hidden) -->
+        <div class="text-center md:border-r border-slate-800 mt-4 md:mt-0">
             <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-1">Markets Open</p>
             <p class="text-2xl font-mono text-white">12</p>
         </div>
-        <div class="text-center hidden md:block">
+
+        <!-- Item 4: Bottom Right on Mobile (Previously Hidden) -->
+        <div class="text-center mt-4 md:mt-0">
             <p class="text-slate-500 text-xs uppercase tracking-widest font-bold mb-1">Platform</p>
-            <p class="text-2xl font-mono text-emerald-400">Live 🟢</p>
+            <p class="text-2xl font-mono text-emerald-400 animate-pulse">Live 🟢</p>
         </div>
     </div>
 
